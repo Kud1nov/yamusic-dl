@@ -1,4 +1,4 @@
-// Package crypto предоставляет функциональность для шифрования и дешифрования данных.
+// Package crypto provides functionality for encrypting and decrypting data.
 package crypto
 
 import (
@@ -12,61 +12,61 @@ import (
 	"strings"
 )
 
-// NonceSize определяет размер nonce для AES-CTR.
+// NonceSize defines the nonce size for AES-CTR.
 const NonceSize = 12
 
-// GenerateSignature генерирует подпись для запроса к API Яндекс Музыки.
-// Использует HMAC-SHA256 для вычисления подписи из строки данных.
-// Строку данных нужно формировать в нужном порядке до вызова этой функции.
+// GenerateSignature generates a signature for a request to the Yandex Music API.
+// Uses HMAC-SHA256 to calculate the signature from a data string.
+// The data string must be formed in the correct order before calling this function.
 func GenerateSignature(dataString string, signKey string) string {
-	// Удаляем запятые из строки данных
+	// Remove commas from the data string
 	dataString = strings.ReplaceAll(dataString, ",", "")
 
-	// Вычисляем HMAC-SHA256
+	// Calculate HMAC-SHA256
 	h := hmac.New(sha256.New, []byte(signKey))
 	h.Write([]byte(dataString))
 
-	// Кодируем результат в Base64 и удаляем последний символ (=)
+	// Encode the result in Base64 and remove the last character (=)
 	sign := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	sign = strings.TrimRight(sign, "=")
 
 	return sign
 }
 
-// GenerateSignatureFromParams генерирует подпись из параметров запроса.
-// Параметры должны быть переданы в правильном порядке.
-// Порядок важен: ts, trackId, quality, codecs, transports
+// GenerateSignatureFromParams generates a signature from request parameters.
+// Parameters must be passed in the correct order.
+// The order is important: ts, trackId, quality, codecs, transports
 func GenerateSignatureFromParams(ts, trackId, quality, codecs, transports, signKey string) string {
-	// Формируем строку из параметров в нужном порядке
+	// Form a string from parameters in the correct order
 	dataString := ts + trackId + quality + codecs + transports
 
 	return GenerateSignature(dataString, signKey)
 }
 
-// DecryptAesCtr расшифровывает данные, зашифрованные алгоритмом AES в режиме CTR.
+// DecryptAesCtr decrypts data encrypted with the AES algorithm in CTR mode.
 func DecryptAesCtr(encryptedData []byte, hexKey string) ([]byte, error) {
-	// Преобразуем ключ из hex в байты
+	// Convert key from hex to bytes
 	key, err := hex.DecodeString(hexKey)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key: %w", err)
 	}
 
-	// Создаем AES шифр
+	// Create AES cipher
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("error creating cipher: %w", err)
 	}
 
-	// Создаем nonce из 12 нулевых байтов и 4 нулевых байта для счетчика
-	// В сумме получаем 16 байтов (размер блока AES)
+	// Create nonce from 12 zero bytes and 4 zero bytes for the counter
+	// In total, we get 16 bytes (AES block size)
 	iv := make([]byte, aes.BlockSize)
-	// Первые 12 байтов - nonce (могут быть все нули)
-	// Последние 4 байта - счетчик (начинается с 0)
+	// First 12 bytes - nonce (can be all zeros)
+	// Last 4 bytes - counter (starts from 0)
 
-	// Создаем CTR режим с нашим IV
+	// Create CTR mode with our IV
 	stream := cipher.NewCTR(block, iv)
 
-	// Расшифровываем данные
+	// Decrypt data
 	decrypted := make([]byte, len(encryptedData))
 	stream.XORKeyStream(decrypted, encryptedData)
 

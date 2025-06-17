@@ -1,4 +1,4 @@
-// Package logger предоставляет функциональность для логирования с использованием zerolog.
+// Package logger provides logging functionality using zerolog.
 package logger
 
 import (
@@ -7,24 +7,24 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Logger обертка вокруг zerolog.Logger
+// Logger wrapper around zerolog.Logger
 type Logger struct {
 	logger zerolog.Logger
 }
 
-// New создает новый экземпляр логгера.
-// Если verbose=true, будет включен отладочный уровень логирования.
+// New creates a new logger instance.
+// If verbose=true, debug level logging will be enabled.
 func New(verbose bool) *Logger {
-	// Настраиваем уровень логирования
+	// Configure logging level
 	level := zerolog.InfoLevel
 	if verbose {
 		level = zerolog.DebugLevel
 	}
 
-	// Настраиваем вывод
+	// Configure output
 	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: "15:04:05"}
 
-	// Создаем и настраиваем логгер
+	// Create and configure logger
 	logger := zerolog.New(output).
 		Level(level).
 		With().
@@ -36,22 +36,22 @@ func New(verbose bool) *Logger {
 	}
 }
 
-// Debug логирует отладочные сообщения
+// Debug logs debug messages
 func (l *Logger) Debug(format string, v ...interface{}) {
 	l.logger.Debug().Msgf(format, v...)
 }
 
-// Info логирует информационные сообщения
+// Info logs informational messages
 func (l *Logger) Info(format string, v ...interface{}) {
 	l.logger.Info().Msgf(format, v...)
 }
 
-// Error логирует сообщения об ошибках
+// Error logs error messages
 func (l *Logger) Error(format string, v ...interface{}) {
 	l.logger.Error().Msgf(format, v...)
 }
 
-// Logger возвращает базовый zerolog.Logger для более гибкого использования
+// Logger returns the underlying zerolog.Logger for more flexible usage
 func (l *Logger) Logger() zerolog.Logger {
 	return l.logger
 }

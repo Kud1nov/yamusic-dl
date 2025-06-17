@@ -1,4 +1,4 @@
-// Package yamusic предоставляет клиент для работы с API Яндекс Музыки.
+// Package yamusic provides a client for working with the Yandex Music API.
 package yamusic
 
 import (
@@ -22,16 +22,16 @@ import (
 	"github.com/Kud1nov/yamusic-dl/internal/utils"
 )
 
-// Псевдонимы для типов из пакета api для обратной совместимости
+// Type aliases from the api package for backward compatibility
 type (
-	// AudioQuality определяет качество трека для скачивания
+	// AudioQuality defines the quality of the track for downloading
 	AudioQuality = api.DownloadQuality
 
-	// ApiTrackQuality определяет качество трека в API Яндекс Музыки
+	// ApiTrackQuality defines the quality of the track in the Yandex Music API
 	ApiTrackQuality = api.TrackQuality
 )
 
-// Константы качества для обратной совместимости
+// Quality constants for backward compatibility
 const (
 	AudioQualityMin    = api.QualityMin
 	AudioQualityNormal = api.QualityStandard
@@ -41,11 +41,11 @@ const (
 	ApiTrackQualityNormal   = api.QualityNormal
 	ApiTrackQualityLossless = api.QualityLossless
 
-	// DefaultSignKey ключ по умолчанию
+	// DefaultSignKey default key
 	DefaultSignKey = api.DefaultSignKey
 )
 
-// Client предоставляет методы для работы с API Яндекс Музыки
+// Client provides methods for working with the Yandex Music API
 type Client struct {
 	accessToken string
 	signKey     string
@@ -54,7 +54,7 @@ type Client struct {
 	httpClient  *http.Client
 }
 
-// NewClient создает новый клиент для работы с API Яндекс Музыки
+// NewClient creates a new client for working with the Yandex Music API
 func NewClient(accessToken, signKey string, log *logger.Logger) *Client {
 	if signKey == "" {
 		signKey = api.DefaultSignKey
@@ -81,72 +81,72 @@ func NewClient(accessToken, signKey string, log *logger.Logger) *Client {
 	return client
 }
 
-// GetTrackInfo получает метаданные трека
+// GetTrackInfo retrieves track metadata
 func (c *Client) GetTrackInfo(trackID string) (map[string]interface{}, error) {
-	c.logger.Debug("Получение метаданных трека %s", trackID)
+	c.logger.Debug("Getting track metadata %s", trackID)
 
-	// Создаем multipart форму
+	// Create multipart form
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	// Добавляем поля в форму
+	// Add fields to the form
 	_ = writer.WriteField("trackIds", trackID)
 	_ = writer.WriteField("removeDuplicates", "false")
 	_ = writer.WriteField("withProgress", "true")
 	writer.Close()
 
-	// Создаем запрос
+	// Create request
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/tracks", api.BaseURL), body)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка создания запроса: %w", err)
+		return nil, fmt.Errorf("request creation error: %w", err)
 	}
 
-	// Устанавливаем заголовки
+	// Set headers
 	for key, value := range c.headers {
 		req.Header.Set(key, value)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	// Выполняем запрос
+	// Execute request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка выполнения запроса: %w", err)
+		return nil, fmt.Errorf("request execution error: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Проверяем статус ответа
+	// Check response status
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API вернул ошибку: %s", resp.Status)
+		return nil, fmt.Errorf("API returned an error: %s", resp.Status)
 	}
 
-	// Разбираем ответ
+	// Parse response
 	var response map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("ошибка разбора ответа: %w", err)
+		return nil, fmt.Errorf("response parsing error: %w", err)
 	}
 
-	// Проверяем наличие результата
+	// Check for result presence
 	result, ok := response["result"].([]interface{})
 	if !ok || len(result) == 0 {
-		return nil, fmt.Errorf("неверный формат ответа: %v", response)
+		return nil, fmt.Errorf("invalid response format: %v", response)
 	}
 
 	trackInfo, ok := result[0].(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("неверный формат ответа: %v", response)
+		return nil, fmt.Errorf("invalid response format: %v", response)
 	}
 
 	return trackInfo, nil
 }
 
-// GetDownloadInfo получает информацию для скачивания трека
+// GetDownloadInfo retrieves information for downloading a track
 func (c *Client) GetDownloadInfo(trackID string, quality ApiTrackQuality) (map[string]interface{}, error) {
-	c.logger.Debug("Получение информации для скачивания трека %s", trackID)
+	c.logger.Debug("Getting download info for track %s", trackID)
 
-	// Формируем параметры запроса
+	// Form request parameters
 	ts := strconv.FormatInt(time.Now().Unix(), 10)
 
-	// Параметры запроса в виде мапы для удобства формирования URL
+	// Request parameters as a map for URL formation convenience
 	params := map[string]string{
 		"ts":         ts,
 		"trackId":    trackID,
@@ -155,73 +155,73 @@ func (c *Client) GetDownloadInfo(trackID string, quality ApiTrackQuality) (map[s
 		"transports": api.Transport,
 	}
 
-	// Генерируем подпись
-	// Важно: собираем строку данных в правильном порядке
+	// Generate signature
+	// Important: assemble the data string in the correct order
 	dataString := ts + trackID + string(quality) + api.Codecs + api.Transport
 	params["sign"] = crypto.GenerateSignature(dataString, c.signKey)
 
-	// Логирование параметров и подписи
-	c.logger.Debug("Параметры запроса: ts=%s, trackId=%s, quality=%s", ts, trackID, quality)
-	c.logger.Debug("Сгенерирована подпись: %s", params["sign"])
+	// Log parameters and signature
+	c.logger.Debug("Request parameters: ts=%s, trackId=%s, quality=%s", ts, trackID, quality)
+	c.logger.Debug("Generated signature: %s", params["sign"])
 
-	// Формируем URL с параметрами
+	// Form URL with parameters
 	baseURL := fmt.Sprintf("%s/get-file-info", api.BaseURL)
 	reqURL, err := url.Parse(baseURL)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка формирования URL: %w", err)
+		return nil, fmt.Errorf("URL formation error: %w", err)
 	}
 
-	// Добавляем параметры запроса
+	// Add request parameters
 	query := reqURL.Query()
 	for key, value := range params {
 		query.Add(key, value)
 	}
 	reqURL.RawQuery = query.Encode()
 
-	// Создаем запрос
+	// Create request
 	req, err := http.NewRequest("GET", reqURL.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка создания запроса: %w", err)
+		return nil, fmt.Errorf("request creation error: %w", err)
 	}
 
-	// Устанавливаем заголовки
+	// Set headers
 	for key, value := range c.headers {
 		req.Header.Set(key, value)
 	}
 
-	// Выполняем запрос
+	// Execute request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка выполнения запроса: %w", err)
+		return nil, fmt.Errorf("request execution error: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Проверяем статус ответа
+	// Check response status
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API вернул ошибку: %s", resp.Status)
+		return nil, fmt.Errorf("API returned an error: %s", resp.Status)
 	}
 
-	// Разбираем ответ
+	// Parse response
 	var response map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("ошибка разбора ответа: %w", err)
+		return nil, fmt.Errorf("response parsing error: %w", err)
 	}
 
-	// Проверяем наличие результата и downloadInfo
+	// Check for result and downloadInfo presence
 	result, ok := response["result"].(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("неверный формат ответа: %v", response)
+		return nil, fmt.Errorf("invalid response format: %v", response)
 	}
 
 	downloadInfo, ok := result["downloadInfo"].(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("неверный формат ответа: %v", response)
+		return nil, fmt.Errorf("invalid response format: %v", response)
 	}
 
 	return downloadInfo, nil
 }
 
-// GetAPIQuality преобразует уровень качества для пользователя в параметр API
+// GetAPIQuality converts user quality level to API parameter
 func (c *Client) GetAPIQuality(quality AudioQuality) ApiTrackQuality {
 	switch quality {
 	case AudioQualityMin:
@@ -235,20 +235,20 @@ func (c *Client) GetAPIQuality(quality AudioQuality) ApiTrackQuality {
 	}
 }
 
-// DownloadTrack скачивает и расшифровывает трек
+// DownloadTrack downloads and decrypts a track
 func (c *Client) DownloadTrack(trackID string, quality AudioQuality, outputDir string) (string, error) {
-	// Получаем метаданные трека
+	// Get track metadata
 	trackInfo, err := c.GetTrackInfo(trackID)
 	if err != nil {
-		c.logger.Error("Ошибка при получении метаданных трека %s: %v", trackID, err)
+		c.logger.Error("Error getting track metadata %s: %v", trackID, err)
 		return "", err
 	}
 
-	// Формируем имя файла из метаданных
+	// Form filename from metadata
 	artist := "Unknown"
 	title := "Unknown"
 
-	// Извлекаем имя исполнителя
+	// Extract artist name
 	if artists, ok := trackInfo["artists"].([]interface{}); ok && len(artists) > 0 {
 		if artistMap, ok := artists[0].(map[string]interface{}); ok {
 			if artistName, ok := artistMap["name"].(string); ok {
@@ -257,111 +257,111 @@ func (c *Client) DownloadTrack(trackID string, quality AudioQuality, outputDir s
 		}
 	}
 
-	// Извлекаем название трека
+	// Extract track title
 	if trackTitle, ok := trackInfo["title"].(string); ok {
 		title = trackTitle
 	}
 
-	// Очищаем имена от недопустимых символов
+	// Clean names from invalid characters
 	safeArtist := utils.CleanFileName(artist)
 	safeTitle := utils.CleanFileName(title)
 	fileName := fmt.Sprintf("%s - %s [%s].m4a", safeArtist, safeTitle, trackID)
 
-	c.logger.Info("Получена информация: %s", fileName)
+	c.logger.Info("Got information: %s", fileName)
 
-	// Получаем информацию для скачивания с учетом выбранного качества
+	// Get download information considering the selected quality
 	apiQuality := c.GetAPIQuality(quality)
 	downloadInfo, err := c.GetDownloadInfo(trackID, apiQuality)
 	if err != nil {
-		c.logger.Error("Ошибка при получении информации для скачивания трека %s: %v", trackID, err)
+		c.logger.Error("Error getting download information for track %s: %v", trackID, err)
 		return "", err
 	}
 
 	fileURL, ok := downloadInfo["url"].(string)
 	if !ok {
-		return "", fmt.Errorf("URL для скачивания не найден")
+		return "", fmt.Errorf("download URL not found")
 	}
 
 	decryptionKey, ok := downloadInfo["key"].(string)
 	if !ok {
-		return "", fmt.Errorf("ключ для расшифровки не найден")
+		return "", fmt.Errorf("decryption key not found")
 	}
 
-	// Создаем временные файлы
+	// Create temporary files
 	tempID := uuid.New().String()
 	encryptedPath := fmt.Sprintf("encrypted_%s.raw", tempID)
 
-	// Создаем отложенную функцию для очистки временных файлов
-	// Она будет вызвана при любом выходе из функции - как нормальном, так и при ошибке или панике
+	// Create a deferred function for cleaning up temporary files
+	// It will be called at any exit from the function - both normal and on error or panic
 	defer func() {
 		if _, err := os.Stat(encryptedPath); err == nil {
-			c.logger.Debug("Удаление временного файла: %s", encryptedPath)
+			c.logger.Debug("Deleting temporary file: %s", encryptedPath)
 			os.Remove(encryptedPath)
 		}
 	}()
 
-	// Проверяем и создаем директорию для сохранения, если нужно
+	// Check and create directory for saving, if needed
 	if outputDir == "" {
 		currentDir, err := os.Getwd()
 		if err != nil {
-			return "", fmt.Errorf("ошибка получения текущей директории: %w", err)
+			return "", fmt.Errorf("error getting current directory: %w", err)
 		}
 		outputDir = currentDir
 	}
 
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return "", fmt.Errorf("ошибка создания директории: %w", err)
+		return "", fmt.Errorf("error creating directory: %w", err)
 	}
 
 	outputPath := filepath.Join(outputDir, fileName)
 
-	// Скачиваем зашифрованный файл
-	c.logger.Info("Скачивание трека...")
+	// Download encrypted file
+	c.logger.Info("Downloading track...")
 	resp, err := http.Get(fileURL)
 	if err != nil {
-		return "", fmt.Errorf("ошибка при скачивании файла: %w", err)
+		return "", fmt.Errorf("error downloading file: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("ошибка при скачивании файла, статус: %s", resp.Status)
+		return "", fmt.Errorf("error downloading file, status: %s", resp.Status)
 	}
 
-	// Сохраняем зашифрованный файл
+	// Save encrypted file
 	encryptedFile, err := os.Create(encryptedPath)
 	if err != nil {
-		return "", fmt.Errorf("ошибка создания временного файла: %w", err)
+		return "", fmt.Errorf("error creating temporary file: %w", err)
 	}
 
 	_, err = io.Copy(encryptedFile, resp.Body)
 	encryptedFile.Close()
 	if err != nil {
-		return "", fmt.Errorf("ошибка при сохранении зашифрованного файла: %w", err)
+		return "", fmt.Errorf("error saving encrypted file: %w", err)
 	}
 
-	// Расшифровываем файл
-	c.logger.Debug("Ключ дешифровки: %s", decryptionKey)
+	// Decrypt file
+	c.logger.Debug("Decryption key: %s", decryptionKey)
 
-	// Читаем зашифрованные данные
+	// Read encrypted data
 	encryptedData, err := os.ReadFile(encryptedPath)
 	if err != nil {
-		return "", fmt.Errorf("ошибка чтения зашифрованного файла: %w", err)
+		return "", fmt.Errorf("error reading encrypted file: %w", err)
 	}
 
-	// Расшифровываем данные
+	// Decrypt data
 	decrypted, err := crypto.DecryptAesCtr(encryptedData, decryptionKey)
 	if err != nil {
-		return "", fmt.Errorf("ошибка расшифровки файла: %w", err)
+		return "", fmt.Errorf("error decrypting file: %w", err)
 	}
 
-	c.logger.Info("Сохранение файла...")
+	c.logger.Info("Saving file...")
 
-	// Сохраняем расшифрованный файл
+	// Save decrypted file
 	err = os.WriteFile(outputPath, decrypted, 0644)
 	if err != nil {
-		return "", fmt.Errorf("ошибка при сохранении расшифрованного файла: %w", err)
+		return "", fmt.Errorf("error saving decrypted file: %w", err)
 	}
 
-	c.logger.Info("Готово: %s", outputPath)
+	c.logger.Info("Done: %s", outputPath)
 	return outputPath, nil
 }

@@ -1,4 +1,4 @@
-// Yamusic-dl - консольная утилита для скачивания музыки из Яндекс Музыки.
+// Yamusic-dl - a console utility for downloading music from Yandex Music.
 package main
 
 import (
@@ -11,50 +11,50 @@ import (
 )
 
 func main() {
-	// Определяем параметры командной строки
-	trackID := flag.String("track", "", "Идентификатор трека")
-	accessToken := flag.String("token", "", "Токен доступа к API Яндекс Музыки")
+	// Define command line parameters
+	trackID := flag.String("track", "", "Track ID")
+	accessToken := flag.String("token", "", "Access token for Yandex Music API")
 	qualityStr := flag.String("quality", string(yamusic.AudioQualityMax),
-		"Качество трека (min, normal, max)")
-	outputDir := flag.String("output", "", "Директория для сохранения файлов")
-	verbose := flag.Bool("verbose", false, "Вывод отладочных сообщений")
+		"Track quality (min, normal, max)")
+	outputDir := flag.String("output", "", "Directory for saving files")
+	verbose := flag.Bool("verbose", false, "Output debug messages")
 
-	// Парсим параметры
+	// Parse parameters
 	flag.Parse()
 
-	// Проверяем обязательные параметры
+	// Check required parameters
 	if *trackID == "" || *accessToken == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	// Проверяем качество
+	// Check quality
 	quality := yamusic.AudioQuality(*qualityStr)
 	if quality != yamusic.AudioQualityMin &&
 		quality != yamusic.AudioQualityNormal &&
 		quality != yamusic.AudioQualityMax {
-		fmt.Println("Ошибка: некорректное качество. Допустимые значения: min, normal, max")
+		fmt.Println("Error: invalid quality. Valid values: min, normal, max")
 		os.Exit(1)
 	}
 
-	// Настраиваем логгер
+	// Configure logger
 	log := logger.New(*verbose)
 
-	// Создаем директорию для сохранения, если нужно
+	// Create directory for saving if needed
 	if *outputDir != "" {
 		if err := os.MkdirAll(*outputDir, 0755); err != nil {
-			log.Error("Ошибка создания директории: %v", err)
+			log.Error("Error creating directory: %v", err)
 			os.Exit(1)
 		}
 	}
 
-	// Создаем клиент Яндекс Музыки
+	// Create Yandex Music client
 	client := yamusic.NewClient(*accessToken, yamusic.DefaultSignKey, log)
 
-	// Скачиваем трек
+	// Download track
 	_, err := client.DownloadTrack(*trackID, quality, *outputDir)
 	if err != nil {
-		log.Error("Ошибка: %v", err)
+		log.Error("Error: %v", err)
 		os.Exit(1)
 	}
 }

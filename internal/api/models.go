@@ -1,50 +1,50 @@
-// Package api содержит модели данных и константы для работы с API Яндекс Музыки.
+// Package api contains data models and constants for working with the Yandex Music API.
 package api
 
 // Constants for API
 const (
-	// BaseURL базовый URL для API Яндекс Музыки
+	// BaseURL base URL for Yandex Music API
 	BaseURL = "https://api.music.yandex.net"
 
-	// DefaultSignKey ключ для подписи запросов по умолчанию
+	// DefaultSignKey default key for request signatures
 	DefaultSignKey = "p93jhgh689SBReK6ghtw62"
 
-	// Codecs поддерживаемые кодеки
+	// Codecs supported codecs
 	Codecs = "flac,flac-mp4,mp3,aac,he-aac,aac-mp4,he-aac-mp4"
 
-	// Transport формат передачи данных
+	// Transport data transfer format
 	Transport = "encraw"
 )
 
-// TrackQuality определяет качество трека в API Яндекс Музыки
+// TrackQuality defines the quality of the track in Yandex Music API
 type TrackQuality string
 
 const (
-	// QualityLow - низкое качество
+	// QualityLow - low quality
 	QualityLow TrackQuality = "lq"
 
-	// QualityNormal - стандартное качество
+	// QualityNormal - standard quality
 	QualityNormal TrackQuality = "nq"
 
-	// QualityLossless - без потерь
+	// QualityLossless - lossless quality
 	QualityLossless TrackQuality = "lossless"
 )
 
-// DownloadQuality определяет качество трека для скачивания
+// DownloadQuality defines the quality of the track for downloading
 type DownloadQuality string
 
 const (
-	// QualityMin - минимальное качество
+	// QualityMin - minimum quality
 	QualityMin DownloadQuality = "min"
 
-	// QualityStandard - стандартное качество
+	// QualityStandard - standard quality
 	QualityStandard DownloadQuality = "normal"
 
-	// QualityHigh - максимальное качество
+	// QualityHigh - maximum quality
 	QualityHigh DownloadQuality = "max"
 )
 
-// Track представляет информацию о треке
+// Track represents track information
 type Track struct {
 	ID       string   `json:"id"`
 	Title    string   `json:"title"`
@@ -53,13 +53,13 @@ type Track struct {
 	Duration int      `json:"durationMs"`
 }
 
-// Artist представляет информацию об исполнителе
+// Artist represents artist information
 type Artist struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
-// Album представляет информацию об альбоме
+// Album represents album information
 type Album struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
