@@ -48,17 +48,42 @@ func (l *Logger) Info(format string, v ...interface{}) {
 	l.logger.Info().Msgf(format, v...)
 }
 
+// Warn logs warning messages
+func (l *Logger) Warn(format string, v ...interface{}) {
+	l.logger.Warn().Msgf(format, v...)
+}
+
 // Error logs error messages
 func (l *Logger) Error(format string, v ...interface{}) {
 	l.logger.Error().Msgf(format, v...)
 }
 
-// IsDebug returns true if debug logging is enabled
-func (l *Logger) IsDebug() bool {
-	return l.level == zerolog.DebugLevel
+// Fatal logs fatal messages and exits
+func (l *Logger) Fatal(format string, v ...interface{}) {
+	l.logger.Fatal().Msgf(format, v...)
 }
 
-// Logger returns the underlying zerolog.Logger for more flexible usage
-func (l *Logger) Logger() zerolog.Logger {
-	return l.logger
+// Infof logs formatted informational messages
+func (l *Logger) Infof(format string, v ...interface{}) {
+	l.logger.Info().Msgf(format, v...)
+}
+
+// Errorf logs formatted error messages
+func (l *Logger) Errorf(format string, v ...interface{}) {
+	l.logger.Error().Msgf(format, v...)
+}
+
+// Debugf logs formatted debug messages
+func (l *Logger) Debugf(format string, v ...interface{}) {
+	l.logger.Debug().Msgf(format, v...)
+}
+
+// Warnf logs formatted warning messages
+func (l *Logger) Warnf(format string, v ...interface{}) {
+	l.logger.Warn().Msgf(format, v...)
+}
+
+// Fatalf logs formatted fatal messages and exits
+func (l *Logger) Fatalf(format string, v ...interface{}) {
+	l.logger.Fatal().Msgf(format, v...)
 }
