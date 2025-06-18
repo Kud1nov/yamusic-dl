@@ -23,20 +23,20 @@ Yamusic-dl позволяет скачивать треки из Яндекс М
 ### Сборка из исходников
 
 ```bash
-git clone https://github.com/username/yamusic-dl.git
+git clone https://github.com/Kud1nov/yamusic-dl.git
 cd yamusic-dl
-go build -o yamusic-dl ./cmd
+go build -o bin/yamusic-dl ./cmd
 ```
 
 ## Использование
 
 ```bash
-./yamusic-dl -track <ID трека> -token <токен доступа> [опции]
+./bin/yamusic-dl -track <ID трека или URL> -token <токен доступа> [опции]
 ```
 
 ### Обязательные параметры
 
-- `-track`: ID трека в Яндекс Музыке
+- `-track`: ID трека или URL Яндекс Музыки
 - `-token`: Токен доступа к API Яндекс Музыки
 
 ### Опциональные параметры
@@ -47,19 +47,19 @@ go build -o yamusic-dl ./cmd
 
 ### Примеры
 
-Скачать трек с ID 123456789 с максимальным качеством:
+Скачать трек по прямой ссылке с максимальным качеством:
 ```bash
-./yamusic-dl -track 123456789 -token YOUR_TOKEN
+./bin/yamusic-dl -track "https://music.yandex.ru/album/10376938/track/64551568" -token YOUR_TOKEN
 ```
 
 Скачать трек с обычным качеством в определенную директорию:
 ```bash
-./yamusic-dl -track 123456789 -token YOUR_TOKEN -quality normal -output ~/Music
+./bin/yamusic-dl -track 123456789 -token YOUR_TOKEN -quality normal -output ~/Music
 ```
 
 ## Архитектура проекта
 
-Проект организован согласно принципам чистой архитектуры и следует рекомендациям по стилю кода Go:
+Проект организован согласно принципам чистой архитек��уры и следует рекомендациям по стилю кода Go:
 
 ```
 yamusic-dl/
@@ -76,7 +76,7 @@ yamusic-dl/
 
 ### Модули
 
-- **cmd/main.go**: Точка входа, обработка аргументов командной строки
+- **cmd/main.go**: Точ��а входа, обработка аргументов командной строки
 - **internal/api**: Модели данных и константы для работы с API
 - **internal/crypto**: Функции для шифрования и дешифрования данных
 - **internal/logger**: Система логирования с уровнями детализации
