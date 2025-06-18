@@ -7,12 +7,13 @@ import (
 	"os"
 
 	"github.com/Kud1nov/yamusic-dl/internal/logger"
+	"github.com/Kud1nov/yamusic-dl/internal/utils"
 	"github.com/Kud1nov/yamusic-dl/pkg/yamusic"
 )
 
 func main() {
 	// Define command line parameters
-	trackID := flag.String("track", "", "Track ID")
+	trackInput := flag.String("track", "", "Track ID or Yandex Music URL")
 	accessToken := flag.String("token", "", "Access token for Yandex Music API")
 	qualityStr := flag.String("quality", string(yamusic.AudioQualityMax),
 		"Track quality (min, normal, max)")
@@ -23,10 +24,13 @@ func main() {
 	flag.Parse()
 
 	// Check required parameters
-	if *trackID == "" || *accessToken == "" {
+	if *trackInput == "" || *accessToken == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
+
+	// Extract track ID from input (URL or ID)
+	trackID := utils.ExtractTrackID(*trackInput)
 
 	// Check quality
 	quality := yamusic.AudioQuality(*qualityStr)
@@ -52,7 +56,7 @@ func main() {
 	client := yamusic.NewClient(*accessToken, yamusic.DefaultSignKey, log)
 
 	// Download track
-	_, err := client.DownloadTrack(*trackID, quality, *outputDir)
+	_, err := client.DownloadTrack(trackID, quality, *outputDir)
 	if err != nil {
 		log.Error("Error: %v", err)
 		os.Exit(1)

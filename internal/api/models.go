@@ -64,3 +64,64 @@ type Album struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
 }
+
+// TrackResponse represents the API response for track information
+type TrackResponse struct {
+	InvocationInfo InvocationInfo `json:"invocationInfo"`
+	Result         []TrackInfo    `json:"result"`
+}
+
+// TrackInfo represents detailed information about a track
+type TrackInfo struct {
+	ID                    string            `json:"id"`
+	RealID                string            `json:"realId"`
+	Title                 string            `json:"title"`
+	Available             bool              `json:"available"`
+	DurationMs            int               `json:"durationMs"`
+	PreviewDurationMs     int               `json:"previewDurationMs"`
+	Artists               []Artist          `json:"artists"`
+	Albums                []Album           `json:"albums"`
+	CoverUri              string            `json:"coverUri"`
+	OgImage               string            `json:"ogImage"`
+	LyricsAvailable       bool              `json:"lyricsAvailable"`
+	Type                  string            `json:"type"`
+	RememberPosition      bool              `json:"rememberPosition"`
+	TrackSharingFlag      string            `json:"trackSharingFlag"`
+	TrackSource           string            `json:"trackSource"`
+	DerivedColors         map[string]string `json:"derivedColors"`
+	SpecialAudioResources []string          `json:"specialAudioResources"`
+}
+
+// DownloadInfoResponse represents the API response for download information
+type DownloadInfoResponse struct {
+	Result         DownloadInfoResult `json:"result"`
+	InvocationInfo InvocationInfo     `json:"invocationInfo"`
+}
+
+// DownloadInfoResult wraps the download information
+type DownloadInfoResult struct {
+	DownloadInfo DownloadInfo `json:"downloadInfo"`
+}
+
+// DownloadInfo contains details needed to download a track
+type DownloadInfo struct {
+	TrackID   string   `json:"trackId"`
+	Quality   string   `json:"quality"`
+	Codec     string   `json:"codec"`
+	Bitrate   int      `json:"bitrate"`
+	Transport string   `json:"transport"`
+	Key       string   `json:"key"`
+	Size      int      `json:"size"`
+	Gain      bool     `json:"gain"`
+	Urls      []string `json:"urls"`
+	Url       string   `json:"url"`
+	RealID    string   `json:"realId"`
+}
+
+// InvocationInfo contains metadata about the API request
+type InvocationInfo struct {
+	ReqID              string `json:"req-id"`
+	Hostname           string `json:"hostname"`
+	ExecDurationMillis int    `json:"exec-duration-millis"`
+	AppName            string `json:"app-name,omitempty"`
+}
