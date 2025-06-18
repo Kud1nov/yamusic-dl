@@ -1,6 +1,8 @@
 // Package api contains data models and constants for working with the Yandex Music API.
 package api
 
+import "encoding/json"
+
 // Constants for API
 const (
 	// BaseURL base URL for Yandex Music API
@@ -55,14 +57,14 @@ type Track struct {
 
 // Artist represents artist information
 type Artist struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID   json.Number `json:"id"` // Changed from string to json.Number for flexibility
+	Name string      `json:"name"`
 }
 
 // Album represents album information
 type Album struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
+	ID    json.Number `json:"id"` // Changed from string to json.Number
+	Title string      `json:"title"`
 }
 
 // TrackResponse represents the API response for track information

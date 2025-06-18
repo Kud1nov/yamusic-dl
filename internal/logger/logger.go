@@ -10,6 +10,7 @@ import (
 // Logger wrapper around zerolog.Logger
 type Logger struct {
 	logger zerolog.Logger
+	level  zerolog.Level
 }
 
 // New creates a new logger instance.
@@ -33,6 +34,7 @@ func New(verbose bool) *Logger {
 
 	return &Logger{
 		logger: logger,
+		level:  level,
 	}
 }
 
@@ -49,6 +51,11 @@ func (l *Logger) Info(format string, v ...interface{}) {
 // Error logs error messages
 func (l *Logger) Error(format string, v ...interface{}) {
 	l.logger.Error().Msgf(format, v...)
+}
+
+// IsDebug returns true if debug logging is enabled
+func (l *Logger) IsDebug() bool {
+	return l.level == zerolog.DebugLevel
 }
 
 // Logger returns the underlying zerolog.Logger for more flexible usage

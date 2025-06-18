@@ -116,24 +116,65 @@ func (c *Client) GetTrackInfo(trackID string) (map[string]interface{}, error) {
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
+		responseBody, _ := io.ReadAll(resp.Body)
+		c.logger.Debug("API error response: %s", string(responseBody))
 		return nil, fmt.Errorf("API returned an error: %s", resp.Status)
 	}
 
-	// Parse response
-	var response map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	// Read response body for debugging and parsing
+	responseData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	// Log raw response for debugging
+	if c.logger.IsDebug() {
+		c.logger.Debug("Raw API response: %s", string(responseData))
+	}
+
+	// Parse response using our defined structure
+	var trackResponse api.TrackResponse
+	if err := json.Unmarshal(responseData, &trackResponse); err != nil {
 		return nil, fmt.Errorf("response parsing error: %w", err)
 	}
 
-	// Check for result presence
-	result, ok := response["result"].([]interface{})
-	if !ok || len(result) == 0 {
-		return nil, fmt.Errorf("invalid response format: %v", response)
+	// Validate response
+	if len(trackResponse.Result) == 0 {
+		return nil, fmt.Errorf("no track information found in API response")
 	}
 
-	trackInfo, ok := result[0].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid response format: %v", response)
+	// Convert structured response to map for backward compatibility
+	trackInfo := make(map[string]interface{})
+
+	// Basic track info
+	trackInfo["id"] = trackResponse.Result[0].ID
+	trackInfo["title"] = trackResponse.Result[0].Title
+	trackInfo["durationMs"] = trackResponse.Result[0].DurationMs
+
+	// Add artists
+	artists := make([]map[string]interface{}, len(trackResponse.Result[0].Artists))
+	for i, artist := range trackResponse.Result[0].Artists {
+		artistMap := make(map[string]interface{})
+		artistMap["id"] = artist.ID.String() // Convert json.Number to string for compatibility
+		artistMap["name"] = artist.Name
+		artists[i] = artistMap
+	}
+	trackInfo["artists"] = artists
+
+	// Add albums
+	albums := make([]map[string]interface{}, len(trackResponse.Result[0].Albums))
+	for i, album := range trackResponse.Result[0].Albums {
+		albumMap := make(map[string]interface{})
+		albumMap["id"] = album.ID.String() // Convert json.Number to string for compatibility
+		albumMap["title"] = album.Title
+		albums[i] = albumMap
+	}
+	trackInfo["albums"] = albums
+
+	// Log found information for debugging
+	c.logger.Debug("Track title: %s", trackResponse.Result[0].Title)
+	if len(trackResponse.Result[0].Artists) > 0 {
+		c.logger.Debug("Artist name: %s", trackResponse.Result[0].Artists[0].Name)
 	}
 
 	return trackInfo, nil
