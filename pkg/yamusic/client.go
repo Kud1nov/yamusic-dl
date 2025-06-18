@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -324,26 +325,12 @@ func (c *Client) DownloadTrack(trackID string, quality AudioQuality, outputDir s
 	// Form filename from metadata
 	artist := "Unknown"
 	title := "Unknown"
+	albumsStr := "Unknown"
+	artists := []string{}
+	albums := []string{}
 
 	// Log the trackInfo structure for debugging
 	c.logger.Debug("TrackInfo structure: %+v", trackInfo)
-
-	// Extract artist name - try different possible formats
-	if artists, ok := trackInfo["artists"].([]map[string]interface{}); ok && len(artists) > 0 {
-		// Format returned by our improved GetTrackInfo
-		if artistName, ok := artists[0]["name"].(string); ok {
-			artist = artistName
-			c.logger.Debug("Found artist name (format 1): %s", artist)
-		}
-	} else if artists, ok := trackInfo["artists"].([]interface{}); ok && len(artists) > 0 {
-		// Original format
-		if artistMap, ok := artists[0].(map[string]interface{}); ok {
-			if artistName, ok := artistMap["name"].(string); ok {
-				artist = artistName
-				c.logger.Debug("Found artist name (format 2): %s", artist)
-			}
-		}
-	}
 
 	// Extract track title
 	if trackTitle, ok := trackInfo["title"].(string); ok {
@@ -351,12 +338,65 @@ func (c *Client) DownloadTrack(trackID string, quality AudioQuality, outputDir s
 		c.logger.Debug("Found track title: %s", title)
 	}
 
-	// If still no title or artist, try to get them directly from the API again
-	if title == "Unknown" || artist == "Unknown" {
-		c.logger.Debug("Missing title or artist, trying direct API access")
+	// Extract artists - collect all artists
+	if artistsList, ok := trackInfo["artists"].([]map[string]interface{}); ok && len(artistsList) > 0 {
+		// Format returned by our improved GetTrackInfo
+		for _, artistMap := range artistsList {
+			if artistName, ok := artistMap["name"].(string); ok {
+				artists = append(artists, artistName)
+				c.logger.Debug("Found artist: %s", artistName)
+			}
+		}
+	} else if artistsList, ok := trackInfo["artists"].([]interface{}); ok && len(artistsList) > 0 {
+		// Original format
+		for _, a := range artistsList {
+			if artistMap, ok := a.(map[string]interface{}); ok {
+				if artistName, ok := artistMap["name"].(string); ok {
+					artists = append(artists, artistName)
+					c.logger.Debug("Found artist: %s", artistName)
+				}
+			}
+		}
+	}
+
+	// Join artists with &
+	if len(artists) > 0 {
+		artist = strings.Join(artists, " & ")
+		c.logger.Debug("Combined artists: %s", artist)
+	}
+
+	// Extract album titles
+	if albumsList, ok := trackInfo["albums"].([]map[string]interface{}); ok && len(albumsList) > 0 {
+		for _, albumMap := range albumsList {
+			if albumTitle, ok := albumMap["title"].(string); ok {
+				albums = append(albums, albumTitle)
+				c.logger.Debug("Found album: %s", albumTitle)
+			}
+		}
+	} else if albumsList, ok := trackInfo["albums"].([]interface{}); ok && len(albumsList) > 0 {
+		for _, a := range albumsList {
+			if albumMap, ok := a.(map[string]interface{}); ok {
+				if albumTitle, ok := albumMap["title"].(string); ok {
+					albums = append(albums, albumTitle)
+					c.logger.Debug("Found album: %s", albumTitle)
+				}
+			}
+		}
+	}
+
+	// Join albums with comma
+
+	if len(albums) > 0 {
+		albumsStr = strings.Join(albums, ", ")
+		c.logger.Debug("Combined albums: %s", albumsStr)
+	}
+
+	// If still no title, artist or albums, try to get them directly from the API again
+	if title == "Unknown" || artist == "Unknown" || (len(albums) == 0 && albumsStr == "Unknown") {
+		c.logger.Debug("Missing title, artist or album, trying direct API access")
 
 		// This is a fallback method to get track info if the structured approach failed
-		apiTitle, apiArtist := c.getTrackInfoFallback(trackID)
+		apiTitle, apiArtist, apiAlbum := c.getTrackInfoFallback(trackID)
 		if title == "Unknown" && apiTitle != "" {
 			title = apiTitle
 			c.logger.Debug("Using fallback title: %s", title)
@@ -365,12 +405,19 @@ func (c *Client) DownloadTrack(trackID string, quality AudioQuality, outputDir s
 			artist = apiArtist
 			c.logger.Debug("Using fallback artist: %s", artist)
 		}
+		if albumsStr == "Unknown" && apiAlbum != "" {
+			albumsStr = apiAlbum
+			c.logger.Debug("Using fallback album: %s", albumsStr)
+		}
 	}
 
 	// Clean names from invalid characters
-	safeArtist := utils.CleanFileName(artist)
 	safeTitle := utils.CleanFileName(title)
-	fileName := fmt.Sprintf("%s - %s [%s].m4a", safeArtist, safeTitle, trackID)
+	safeArtist := utils.CleanFileName(artist)
+	safeAlbums := utils.CleanFileName(albumsStr)
+
+	// Format: Track Title - Artist1 & Artist2 (Album1, Album2) [ID трека]
+	fileName := fmt.Sprintf("%s - %s (%s) [%s].m4a", safeTitle, safeArtist, safeAlbums, trackID)
 
 	c.logger.Info("Got information: %s", fileName)
 
@@ -472,12 +519,12 @@ func (c *Client) DownloadTrack(trackID string, quality AudioQuality, outputDir s
 }
 
 // getTrackInfoFallback is a simpler method to extract basic track info when the main method fails
-func (c *Client) getTrackInfoFallback(trackID string) (title, artist string) {
+func (c *Client) getTrackInfoFallback(trackID string) (title, artist, album string) {
 	// Create a simple GET request instead of POST with multipart form
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/tracks/%s", api.BaseURL, trackID), nil)
 	if err != nil {
 		c.logger.Debug("Fallback request creation error: %v", err)
-		return "", ""
+		return "", "", ""
 	}
 
 	// Set headers
@@ -489,25 +536,25 @@ func (c *Client) getTrackInfoFallback(trackID string) (title, artist string) {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		c.logger.Debug("Fallback request execution error: %v", err)
-		return "", ""
+		return "", "", ""
 	}
 	defer resp.Body.Close()
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
 		c.logger.Debug("Fallback API returned error status: %s", resp.Status)
-		return "", ""
+		return "", "", ""
 	}
 
 	// Parse response as generic map
 	var response map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		c.logger.Debug("Fallback response parsing error: %v", err)
-		return "", ""
+		return "", "", ""
 	}
 
 	// Try to extract track info
-	var extractedTitle, extractedArtist string
+	var extractedTitle, extractedArtist, extractedAlbum string
 
 	// Extract from result
 	if result, ok := response["result"].(map[string]interface{}); ok {
@@ -526,7 +573,17 @@ func (c *Client) getTrackInfoFallback(trackID string) (title, artist string) {
 				}
 			}
 		}
+
+		// Extract album
+		if albums, ok := result["albums"].([]interface{}); ok && len(albums) > 0 {
+			if albumMap, ok := albums[0].(map[string]interface{}); ok {
+				if albumTitle, ok := albumMap["title"].(string); ok {
+					extractedAlbum = albumTitle
+					c.logger.Debug("Fallback found album: %s", extractedAlbum)
+				}
+			}
+		}
 	}
 
-	return extractedTitle, extractedArtist
+	return extractedTitle, extractedArtist, extractedAlbum
 }
