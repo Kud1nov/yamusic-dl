@@ -32,20 +32,6 @@ type (
 	ApiTrackQuality = api.TrackQuality
 )
 
-// Quality constants for backward compatibility
-const (
-	AudioQualityMin    = api.QualityMin
-	AudioQualityNormal = api.QualityStandard
-	AudioQualityMax    = api.QualityHigh
-
-	ApiTrackQualityLow      = api.QualityLow
-	ApiTrackQualityNormal   = api.QualityNormal
-	ApiTrackQualityLossless = api.QualityLossless
-
-	// DefaultSignKey default key
-	DefaultSignKey = api.DefaultSignKey
-)
-
 // Client provides methods for working with the Yandex Music API
 type Client struct {
 	accessToken string
@@ -75,8 +61,7 @@ func NewClient(accessToken, signKey string, log *logger.Logger) *Client {
 	client.headers = map[string]string{
 		"Accept-Language":       "ru",
 		"Authorization":         fmt.Sprintf("OAuth %s", accessToken),
-		"x-yandex-music-client": "YandexMusicAndroid/24023621",
-		"User-Agent":            "Ya-Music-DL/1.0",
+		"x-yandex-music-client": api.DefaultClient,
 	}
 
 	return client
@@ -299,20 +284,6 @@ func (c *Client) GetDownloadInfo(trackID string, quality ApiTrackQuality) (map[s
 	return downloadInfo, nil
 }
 
-// GetAPIQuality converts user quality level to API parameter
-func (c *Client) GetAPIQuality(quality AudioQuality) ApiTrackQuality {
-	switch quality {
-	case AudioQualityMin:
-		return ApiTrackQualityLow
-	case AudioQualityNormal:
-		return ApiTrackQualityNormal
-	case AudioQualityMax:
-		return ApiTrackQualityLossless
-	default:
-		return ApiTrackQualityLossless
-	}
-}
-
 // DownloadTrack downloads and decrypts a track
 func (c *Client) DownloadTrack(trackID string, quality AudioQuality, outputDir string) (string, error) {
 	// Get track metadata
@@ -422,7 +393,7 @@ func (c *Client) DownloadTrack(trackID string, quality AudioQuality, outputDir s
 	c.logger.Info("Got information: %s", fileName)
 
 	// Get download information considering the selected quality
-	apiQuality := c.GetAPIQuality(quality)
+	apiQuality := api.ConvertQuality(quality)
 	downloadInfo, err := c.GetDownloadInfo(trackID, apiQuality)
 	if err != nil {
 		c.logger.Error("Error getting download information for track %s: %v", trackID, err)

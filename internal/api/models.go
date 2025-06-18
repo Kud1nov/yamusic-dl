@@ -9,7 +9,8 @@ const (
 	BaseURL = "https://api.music.yandex.net"
 
 	// DefaultSignKey default key for request signatures
-	DefaultSignKey = "p93jhgh689SBReK6ghtw62"
+	DefaultSignKey = "uz0zSpaYCLmgk6C7YLdo5F"
+	DefaultClient  = "YandexMusicDesktopAppMacOS/5.54.0"
 
 	// Codecs supported codecs
 	Codecs = "flac,flac-mp4,mp3,aac,he-aac,aac-mp4,he-aac-mp4"
@@ -17,6 +18,20 @@ const (
 	// Transport data transfer format
 	Transport = "encraw"
 )
+
+// ConvertQuality converts user quality level to API parameter
+func ConvertQuality(quality DownloadQuality) TrackQuality {
+	switch quality {
+	case QualityMin:
+		return QualityLow
+	case QualityStandard:
+		return QualityNormal
+	case QualityHigh:
+		return QualityLossless
+	default:
+		return QualityLossless
+	}
+}
 
 // TrackQuality defines the quality of the track in Yandex Music API
 type TrackQuality string
