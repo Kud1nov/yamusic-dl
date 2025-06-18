@@ -7,9 +7,17 @@ import (
 )
 
 // CleanFileName cleans a string from invalid characters for a filename.
-// Only keeps letters, digits, and some special characters.
+// Keeps letters (including Cyrillic), digits, and some special characters.
 func CleanFileName(name string) string {
-	reg := regexp.MustCompile(`[^a-zA-Z0-9 _\-]`)
-	clean := reg.ReplaceAllString(name, "")
-	return strings.TrimSpace(clean)
+	// Replace characters that are invalid in filenames
+	reg := regexp.MustCompile(`[\\/:*?"<>|]`)
+	clean := reg.ReplaceAllString(name, "_")
+
+	// Trim spaces and make sure we have something
+	clean = strings.TrimSpace(clean)
+	if clean == "" {
+		return "Unknown"
+	}
+
+	return clean
 }

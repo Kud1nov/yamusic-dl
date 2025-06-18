@@ -128,9 +128,28 @@ func (c *Client) GetTrackInfo(trackID string) (map[string]interface{}, error) {
 	}
 
 	// Log raw response for debugging
-	if c.logger.IsDebug() {
-		c.logger.Debug("Raw API response: %s", string(responseData))
+	c.logger.Debug("Raw API response: %s", string(responseData))
+
+	// First try to parse as generic map to inspect structure
+	var rawResponse map[string]interface{}
+	if err := json.Unmarshal(responseData, &rawResponse); err != nil {
+		return nil, fmt.Errorf("error parsing raw response: %w", err)
 	}
+
+	// Check raw response structure
+	result, ok := rawResponse["result"].([]interface{})
+	if !ok || len(result) == 0 {
+		return nil, fmt.Errorf("invalid result format in raw response")
+	}
+
+	// Log raw track info for debugging
+	trackMap, ok := result[0].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid track format in raw response")
+	}
+
+	c.logger.Debug("Raw track title: %v", trackMap["title"])
+	c.logger.Debug("Raw artists: %v", trackMap["artists"])
 
 	// Parse response using our defined structure
 	var trackResponse api.TrackResponse
@@ -143,38 +162,55 @@ func (c *Client) GetTrackInfo(trackID string) (map[string]interface{}, error) {
 		return nil, fmt.Errorf("no track information found in API response")
 	}
 
-	// Convert structured response to map for backward compatibility
+	// Log structured data for debugging
+	c.logger.Debug("Structured track title: %s", trackResponse.Result[0].Title)
+	if len(trackResponse.Result[0].Artists) > 0 {
+		c.logger.Debug("Structured artist name: %s", trackResponse.Result[0].Artists[0].Name)
+	} else {
+		c.logger.Debug("No artists found in structured response")
+	}
+
+	// Create trackInfo from raw response instead of structured
 	trackInfo := make(map[string]interface{})
 
 	// Basic track info
-	trackInfo["id"] = trackResponse.Result[0].ID
-	trackInfo["title"] = trackResponse.Result[0].Title
-	trackInfo["durationMs"] = trackResponse.Result[0].DurationMs
+	trackInfo["id"] = trackMap["id"]
+	trackInfo["title"] = trackMap["title"]
+	trackInfo["durationMs"] = trackMap["durationMs"]
 
-	// Add artists
-	artists := make([]map[string]interface{}, len(trackResponse.Result[0].Artists))
-	for i, artist := range trackResponse.Result[0].Artists {
-		artistMap := make(map[string]interface{})
-		artistMap["id"] = artist.ID.String() // Convert json.Number to string for compatibility
-		artistMap["name"] = artist.Name
-		artists[i] = artistMap
+	// Add artists from raw response
+	if rawArtists, ok := trackMap["artists"].([]interface{}); ok && len(rawArtists) > 0 {
+		artists := make([]map[string]interface{}, len(rawArtists))
+		for i, rawArtist := range rawArtists {
+			if artistMap, ok := rawArtist.(map[string]interface{}); ok {
+				artist := make(map[string]interface{})
+				artist["id"] = artistMap["id"]
+				artist["name"] = artistMap["name"]
+				artists[i] = artist
+				c.logger.Debug("Adding artist: %v", artist["name"])
+			}
+		}
+		trackInfo["artists"] = artists
 	}
-	trackInfo["artists"] = artists
 
-	// Add albums
-	albums := make([]map[string]interface{}, len(trackResponse.Result[0].Albums))
-	for i, album := range trackResponse.Result[0].Albums {
-		albumMap := make(map[string]interface{})
-		albumMap["id"] = album.ID.String() // Convert json.Number to string for compatibility
-		albumMap["title"] = album.Title
-		albums[i] = albumMap
+	// Add albums from raw response
+	if rawAlbums, ok := trackMap["albums"].([]interface{}); ok && len(rawAlbums) > 0 {
+		albums := make([]map[string]interface{}, len(rawAlbums))
+		for i, rawAlbum := range rawAlbums {
+			if albumMap, ok := rawAlbum.(map[string]interface{}); ok {
+				album := make(map[string]interface{})
+				album["id"] = albumMap["id"]
+				album["title"] = albumMap["title"]
+				albums[i] = album
+			}
+		}
+		trackInfo["albums"] = albums
 	}
-	trackInfo["albums"] = albums
 
-	// Log found information for debugging
-	c.logger.Debug("Track title: %s", trackResponse.Result[0].Title)
-	if len(trackResponse.Result[0].Artists) > 0 {
-		c.logger.Debug("Artist name: %s", trackResponse.Result[0].Artists[0].Name)
+	// Verify the trackInfo map has the expected values
+	c.logger.Debug("Track title in trackInfo: %v", trackInfo["title"])
+	if artists, ok := trackInfo["artists"].([]map[string]interface{}); ok && len(artists) > 0 {
+		c.logger.Debug("First artist name in trackInfo: %v", artists[0]["name"])
 	}
 
 	return trackInfo, nil
@@ -289,11 +325,22 @@ func (c *Client) DownloadTrack(trackID string, quality AudioQuality, outputDir s
 	artist := "Unknown"
 	title := "Unknown"
 
-	// Extract artist name
-	if artists, ok := trackInfo["artists"].([]interface{}); ok && len(artists) > 0 {
+	// Log the trackInfo structure for debugging
+	c.logger.Debug("TrackInfo structure: %+v", trackInfo)
+
+	// Extract artist name - try different possible formats
+	if artists, ok := trackInfo["artists"].([]map[string]interface{}); ok && len(artists) > 0 {
+		// Format returned by our improved GetTrackInfo
+		if artistName, ok := artists[0]["name"].(string); ok {
+			artist = artistName
+			c.logger.Debug("Found artist name (format 1): %s", artist)
+		}
+	} else if artists, ok := trackInfo["artists"].([]interface{}); ok && len(artists) > 0 {
+		// Original format
 		if artistMap, ok := artists[0].(map[string]interface{}); ok {
 			if artistName, ok := artistMap["name"].(string); ok {
 				artist = artistName
+				c.logger.Debug("Found artist name (format 2): %s", artist)
 			}
 		}
 	}
@@ -301,6 +348,23 @@ func (c *Client) DownloadTrack(trackID string, quality AudioQuality, outputDir s
 	// Extract track title
 	if trackTitle, ok := trackInfo["title"].(string); ok {
 		title = trackTitle
+		c.logger.Debug("Found track title: %s", title)
+	}
+
+	// If still no title or artist, try to get them directly from the API again
+	if title == "Unknown" || artist == "Unknown" {
+		c.logger.Debug("Missing title or artist, trying direct API access")
+
+		// This is a fallback method to get track info if the structured approach failed
+		apiTitle, apiArtist := c.getTrackInfoFallback(trackID)
+		if title == "Unknown" && apiTitle != "" {
+			title = apiTitle
+			c.logger.Debug("Using fallback title: %s", title)
+		}
+		if artist == "Unknown" && apiArtist != "" {
+			artist = apiArtist
+			c.logger.Debug("Using fallback artist: %s", artist)
+		}
 	}
 
 	// Clean names from invalid characters
@@ -405,4 +469,64 @@ func (c *Client) DownloadTrack(trackID string, quality AudioQuality, outputDir s
 
 	c.logger.Info("Done: %s", outputPath)
 	return outputPath, nil
+}
+
+// getTrackInfoFallback is a simpler method to extract basic track info when the main method fails
+func (c *Client) getTrackInfoFallback(trackID string) (title, artist string) {
+	// Create a simple GET request instead of POST with multipart form
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/tracks/%s", api.BaseURL, trackID), nil)
+	if err != nil {
+		c.logger.Debug("Fallback request creation error: %v", err)
+		return "", ""
+	}
+
+	// Set headers
+	for key, value := range c.headers {
+		req.Header.Set(key, value)
+	}
+
+	// Execute request
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		c.logger.Debug("Fallback request execution error: %v", err)
+		return "", ""
+	}
+	defer resp.Body.Close()
+
+	// Check response status
+	if resp.StatusCode != http.StatusOK {
+		c.logger.Debug("Fallback API returned error status: %s", resp.Status)
+		return "", ""
+	}
+
+	// Parse response as generic map
+	var response map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		c.logger.Debug("Fallback response parsing error: %v", err)
+		return "", ""
+	}
+
+	// Try to extract track info
+	var extractedTitle, extractedArtist string
+
+	// Extract from result
+	if result, ok := response["result"].(map[string]interface{}); ok {
+		// Extract title
+		if trackTitle, ok := result["title"].(string); ok {
+			extractedTitle = trackTitle
+			c.logger.Debug("Fallback found title: %s", extractedTitle)
+		}
+
+		// Extract artist
+		if artists, ok := result["artists"].([]interface{}); ok && len(artists) > 0 {
+			if artistMap, ok := artists[0].(map[string]interface{}); ok {
+				if artistName, ok := artistMap["name"].(string); ok {
+					extractedArtist = artistName
+					c.logger.Debug("Fallback found artist: %s", extractedArtist)
+				}
+			}
+		}
+	}
+
+	return extractedTitle, extractedArtist
 }
